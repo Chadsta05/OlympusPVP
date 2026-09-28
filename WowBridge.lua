@@ -809,16 +809,6 @@ local function OnEvent(_, event, ...)
     end
   end
 
-  if event == "PLAYER_LOGIN" then
-    if GetCVar then
-      if GetCVar("nameplateShowEnemies") == "0" then
-        PrintToChat(
-          "[Olympus PVP] Enemy nameplates help the scanner. Press V / Shift+V if frames are empty."
-        )
-      end
-    end
-  end
-
   eventHandler(event, payload)
 
   if uiRefresh then

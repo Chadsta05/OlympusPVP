@@ -112,8 +112,6 @@ function Core.CreateScanner(dependencies)
   local pvpCombatants = {}
   ---@type OlympusPVPCombatant[]
   local friendlyCombatants = {}
-  ---@type table<string, boolean>
-  local loggedRelationKeys = {}
   ---@type boolean
   local wasInBattleground = false
 
@@ -346,7 +344,6 @@ function Core.CreateScanner(dependencies)
     pvpCombatants = {}
     friendlyCombatants = {}
     lastGankSighting = nil
-    loggedRelationKeys = {}
     needsInspect.clear()
     recentAttackers = {}
   end
@@ -751,47 +748,6 @@ function Core.CreateScanner(dependencies)
   end
 
   ---@param name string
-  ---@param info OlympusPVPUnitRelation
-  ---@param kind string
-  ---@param action string
-  local function LogRelation(name, info, kind, action)
-    local key = name .. "|" .. kind .. "|" .. action
-
-    if loggedRelationKeys[key] then
-      return
-    end
-
-    loggedRelationKeys[key] = true
-
-    local them = info.faction or "?"
-    local you = info.playerFaction or "?"
-    local reaction = "?"
-
-    if info.reaction then
-      reaction = tostring(info.reaction)
-    end
-
-    dependencies.printToChat(
-      "[Olympus PVP] "
-        .. action
-        .. " "
-        .. name
-        .. " you="
-        .. you
-        .. " them="
-        .. them
-        .. " reaction="
-        .. reaction
-        .. " canAttack="
-        .. tostring(info.canAttack)
-        .. " inGroup="
-        .. tostring(info.inGroup)
-        .. " list="
-        .. kind
-    )
-  end
-
-  ---@param name string
   ---@param unit? string
   local function AppendFoe(name, unit)
     local existing = FindPvpCombatant(name)
@@ -876,7 +832,6 @@ function Core.CreateScanner(dependencies)
 
     if kind == "foe" then
       if not settings.pvpModeEnabled then
-        LogRelation(name, info, kind, "skip")
         return
       end
 
@@ -887,21 +842,17 @@ function Core.CreateScanner(dependencies)
 
         if existing then
           RefreshPvpCombatant(existing, existing.name, unit)
-        else
-          LogRelation(name, info, kind, "pause")
         end
 
         return
       end
 
-      LogRelation(name, info, kind, "add")
       AppendFoe(name, unit)
       return
     end
 
     if kind == "friendly" then
       if not settings.friendlyModeEnabled then
-        LogRelation(name, info, kind, "skip")
         return
       end
 
@@ -912,19 +863,14 @@ function Core.CreateScanner(dependencies)
 
         if existing then
           RefreshPvpCombatant(existing, existing.name, unit)
-        else
-          LogRelation(name, info, kind, "pause")
         end
 
         return
       end
 
-      LogRelation(name, info, kind, "add")
       AppendFriendly(name, unit)
       return
     end
-
-    LogRelation(name, info, kind, "skip")
   end
 
   ---@param name string
@@ -1282,14 +1228,6 @@ function Core.CreateScanner(dependencies)
     if event == "PLAYER_LOGIN" then
       ClearPvpCombatants()
       wasInBattleground = false
-      dependencies.printToChat("[Olympus PVP] loaded.")
-      dependencies.printToChat(
-        "[Olympus PVP] Enemy frames "
-          .. tostring(settings.pvpModeEnabled)
-          .. " friendly frames "
-          .. tostring(settings.friendlyModeEnabled)
-          .. "."
-      )
       return
     end
 
