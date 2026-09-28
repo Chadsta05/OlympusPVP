@@ -19,6 +19,7 @@ local DEFAULT_SETTINGS = {
   pvpModeEnabled = true,
   friendlyModeEnabled = false,
   includeSelfOnFriendly = false,
+  includeGroupOnFriendly = true,
   enemyListPaused = false,
   friendlyListPaused = false,
   gankNames = {},
@@ -53,6 +54,7 @@ function Settings.CreateDefaultSettings()
     pvpModeEnabled = DEFAULT_SETTINGS.pvpModeEnabled,
     friendlyModeEnabled = DEFAULT_SETTINGS.friendlyModeEnabled,
     includeSelfOnFriendly = DEFAULT_SETTINGS.includeSelfOnFriendly,
+    includeGroupOnFriendly = DEFAULT_SETTINGS.includeGroupOnFriendly,
     enemyListPaused = DEFAULT_SETTINGS.enemyListPaused,
     friendlyListPaused = DEFAULT_SETTINGS.friendlyListPaused,
     gankNames = CopyNames(DEFAULT_SETTINGS.gankNames),
@@ -71,6 +73,7 @@ function Settings.CloneSettings(settings)
     pvpModeEnabled = settings.pvpModeEnabled,
     friendlyModeEnabled = settings.friendlyModeEnabled,
     includeSelfOnFriendly = settings.includeSelfOnFriendly,
+    includeGroupOnFriendly = settings.includeGroupOnFriendly,
     enemyListPaused = settings.enemyListPaused,
     friendlyListPaused = settings.friendlyListPaused,
     gankNames = CopyNames(settings.gankNames),
@@ -116,6 +119,10 @@ function Settings.MergeSettings(saved)
 
   if saved.includeSelfOnFriendly ~= nil then
     merged.includeSelfOnFriendly = saved.includeSelfOnFriendly
+  end
+
+  if saved.includeGroupOnFriendly ~= nil then
+    merged.includeGroupOnFriendly = saved.includeGroupOnFriendly
   end
 
   if saved.enemyListPaused ~= nil then
@@ -181,6 +188,10 @@ function Settings.CreateSettingsStore(initialSettings)
 
     if changes.includeSelfOnFriendly ~= nil then
       nextSettings.includeSelfOnFriendly = changes.includeSelfOnFriendly
+    end
+
+    if changes.includeGroupOnFriendly ~= nil then
+      nextSettings.includeGroupOnFriendly = changes.includeGroupOnFriendly
     end
 
     if changes.enemyListPaused ~= nil then

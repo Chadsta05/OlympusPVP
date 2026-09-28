@@ -11,6 +11,7 @@
 ---@field pvpModeEnabled boolean
 ---@field friendlyModeEnabled boolean
 ---@field includeSelfOnFriendly boolean
+---@field includeGroupOnFriendly boolean
 ---@field enemyListPaused boolean
 ---@field friendlyListPaused boolean
 ---@field gankNames string[]
@@ -24,6 +25,7 @@
 ---@field pvpModeEnabled? boolean
 ---@field friendlyModeEnabled? boolean
 ---@field includeSelfOnFriendly? boolean
+---@field includeGroupOnFriendly? boolean
 ---@field enemyListPaused? boolean
 ---@field friendlyListPaused? boolean
 ---@field gankNames? string[]

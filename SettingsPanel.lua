@@ -36,6 +36,8 @@ function SettingsPanel.Create(dependencies)
   ---@type any?
   local selfCheck
   ---@type any?
+  local groupCheck
+  ---@type any?
   local nameInput
   ---@type table
   local nameRows = {}
@@ -121,6 +123,10 @@ function SettingsPanel.Create(dependencies)
       selfCheck:SetChecked(settings.includeSelfOnFriendly)
     end
 
+    if groupCheck then
+      groupCheck:SetChecked(settings.includeGroupOnFriendly)
+    end
+
     local index = 1
 
     while index <= 12 do
@@ -153,7 +159,7 @@ function SettingsPanel.Create(dependencies)
     end
 
     frame = CreateFrame("Frame", "OlympusPVPSettingsFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(320, 502)
+    frame:SetSize(320, 534)
     frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     frame:SetMovable(true)
     frame:EnableMouse(true)
@@ -218,7 +224,7 @@ function SettingsPanel.Create(dependencies)
     ---@type any?
     local friendlyLabel = _G["OlympusPVPFriendlyCheckText"]
     if friendlyLabel then
-      friendlyLabel:SetText("Friendly raid frames")
+      friendlyLabel:SetText("Nearby friendlies (outside group)")
     end
     friendlyCheck:SetScript("OnClick", function(self)
       local checked = self:GetChecked()
@@ -241,14 +247,28 @@ function SettingsPanel.Create(dependencies)
       })
     end)
 
+    groupCheck = CreateFrame("CheckButton", "OlympusPVPGroupFriendlyCheck", frame, "UICheckButtonTemplate")
+    groupCheck:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -172)
+    ---@type any?
+    local groupLabel = _G["OlympusPVPGroupFriendlyCheckText"]
+    if groupLabel then
+      groupLabel:SetText("Show group members")
+    end
+    groupCheck:SetScript("OnClick", function(self)
+      local checked = self:GetChecked()
+      dependencies.updateSettings({
+        includeGroupOnFriendly = checked == true or checked == 1,
+      })
+    end)
+
     ---@type any
     local gankTitle = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    gankTitle:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -178)
+    gankTitle:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -210)
     gankTitle:SetText("Gank list")
 
     nameInput = CreateFrame("EditBox", "OlympusPVPGankInput", frame, "InputBoxTemplate")
     nameInput:SetSize(200, 22)
-    nameInput:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, -200)
+    nameInput:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, -232)
     nameInput:SetAutoFocus(false)
 
     ---@type any
@@ -274,7 +294,7 @@ function SettingsPanel.Create(dependencies)
     while rowIndex <= 12 do
       ---@type any
       local label = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-      label:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, -232 - ((rowIndex - 1) * 18))
+      label:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, -264 - ((rowIndex - 1) * 18))
       label:SetWidth(230)
       label:SetJustifyH("LEFT")
 

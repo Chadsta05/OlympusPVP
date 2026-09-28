@@ -24,10 +24,10 @@ Enable **Olympus PVP** at the character select AddOns screen. `/reload` after up
 
 ## Commands
 
-- `/olympus` or `/opvp` — open or close settings
-- `/olympus pvpclear` — clear the boards
-- `/olympus reset` — restore defaults
-- `/olympus help`
+- `/olympuspvp` or `/opvp` — open or close settings
+- `/olympuspvp pvpclear` — clear the boards
+- `/olympuspvp reset` — restore defaults
+- `/olympuspvp help`
 
 ## License
 

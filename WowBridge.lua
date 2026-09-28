@@ -309,6 +309,20 @@ local function ScanVisibleUnits()
 
     index = index + 1
   end
+
+  local partyIndex = 1
+
+  while partyIndex <= 4 do
+    ScanUnitToken("party" .. tostring(partyIndex), "NAME_PLATE_UNIT_ADDED")
+    partyIndex = partyIndex + 1
+  end
+
+  local raidIndex = 1
+
+  while raidIndex <= 40 do
+    ScanUnitToken("raid" .. tostring(raidIndex), "NAME_PLATE_UNIT_ADDED")
+    raidIndex = raidIndex + 1
+  end
 end
 
 local function OnUpdate(_, elapsed)
@@ -878,8 +892,9 @@ end
 
 ---@param handler fun(input?: string)
 local function RegisterSlashCommand(handler)
-  SLASH_OLYMPUSPVP1 = "/olympus"
+  SLASH_OLYMPUSPVP1 = "/olympuspvp"
   SLASH_OLYMPUSPVP2 = "/opvp"
+  SLASH_OLYMPUSPVP3 = nil
 
   if not SlashCmdList then
     SlashCmdList = {}

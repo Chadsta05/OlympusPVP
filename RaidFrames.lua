@@ -255,6 +255,30 @@ local function FindLiveUnit(name, preferred)
     index = index + 1
   end
 
+  local partyIndex = 1
+
+  while partyIndex <= 4 do
+    local unit = "party" .. tostring(partyIndex)
+
+    if UnitMatches(unit) then
+      return unit
+    end
+
+    partyIndex = partyIndex + 1
+  end
+
+  local raidIndex = 1
+
+  while raidIndex <= 40 do
+    local unit = "raid" .. tostring(raidIndex)
+
+    if UnitMatches(unit) then
+      return unit
+    end
+
+    raidIndex = raidIndex + 1
+  end
+
   return nil
 end
 

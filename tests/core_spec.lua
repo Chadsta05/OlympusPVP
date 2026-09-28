@@ -333,7 +333,6 @@ describe("OlympusPVP Core", function()
     local fixture = CreateFixture({
       unitName = "Horde Rogue",
       settings = {
-        friendlyModeEnabled = true,
         includeSelfOnFriendly = true,
       },
     })
@@ -471,6 +470,54 @@ describe("OlympusPVP Core", function()
 
     assert.same({}, Names(fixture.scanner))
     assert.same({ "Tilds Telemand" }, FriendlyNames(fixture.scanner))
+  end)
+
+  it("puts group members on the friendly list", function()
+    local fixture = CreateFixture({
+      unitName = "Party Paladin",
+      settings = {
+        friendlyModeEnabled = false,
+        includeGroupOnFriendly = true,
+      },
+      relation = {
+        faction = "Alliance",
+        playerFaction = "Alliance",
+        reaction = 5,
+        canAttack = false,
+        isEnemy = false,
+        sameFaction = true,
+        inGroup = true,
+      },
+    })
+
+    fixture.scanner.HandleEvent("NAME_PLATE_UNIT_ADDED", { unit = "party1" })
+
+    assert.same({}, Names(fixture.scanner))
+    assert.same({ "Party Paladin" }, FriendlyNames(fixture.scanner))
+  end)
+
+  it("can skip group members on the friendly list", function()
+    local fixture = CreateFixture({
+      unitName = "Party Paladin",
+      settings = {
+        friendlyModeEnabled = true,
+        includeGroupOnFriendly = false,
+      },
+      relation = {
+        faction = "Alliance",
+        playerFaction = "Alliance",
+        reaction = 5,
+        canAttack = false,
+        isEnemy = false,
+        sameFaction = true,
+        inGroup = true,
+      },
+    })
+
+    fixture.scanner.HandleEvent("NAME_PLATE_UNIT_ADDED", { unit = "party1" })
+
+    assert.same({}, Names(fixture.scanner))
+    assert.same({}, FriendlyNames(fixture.scanner))
   end)
 
   it("adds hostile players from nameplates before combat", function()

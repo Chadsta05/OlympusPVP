@@ -761,11 +761,17 @@ function Core.CreateScanner(dependencies)
     end
 
     if info.inGroup == true then
-      return "grouped"
+      local settings = dependencies.getSettings()
+
+      if settings.includeGroupOnFriendly then
+        return "grouped"
+      end
+
+      return "skip-group"
     end
 
     if info.sameFaction == true then
-      return "friendly"
+      return "nearby"
     end
 
     return "unknown"
@@ -888,11 +894,6 @@ function Core.CreateScanner(dependencies)
       return
     end
 
-    if not settings.friendlyModeEnabled then
-      friendlyCombatants = DismissFromList(friendlyCombatants, playerName)
-      return
-    end
-
     if not settings.includeSelfOnFriendly then
       friendlyCombatants = DismissFromList(friendlyCombatants, playerName)
       return
@@ -946,24 +947,41 @@ function Core.CreateScanner(dependencies)
       return
     end
 
-    if kind == "friendly" then
-      if not settings.friendlyModeEnabled then
-        return
-      end
+    if kind == "skip-group" then
+      friendlyCombatants = DismissFromList(friendlyCombatants, name)
+      return
+    end
 
-      pvpCombatants = DismissFromList(pvpCombatants, name)
+    ---@param listedName string
+    ---@param listedUnit? string
+    local function TryAppendFriendly(listedName, listedUnit)
+      pvpCombatants = DismissFromList(pvpCombatants, listedName)
 
       if settings.friendlyListPaused then
-        local existing = FindFriendlyCombatant(name)
+        local existing = FindFriendlyCombatant(listedName)
 
         if existing then
-          RefreshPvpCombatant(existing, existing.name, unit)
+          RefreshPvpCombatant(existing, existing.name, listedUnit)
         end
 
         return
       end
 
-      AppendFriendly(name, unit)
+      AppendFriendly(listedName, listedUnit)
+    end
+
+    if kind == "grouped" then
+      TryAppendFriendly(name, unit)
+      return
+    end
+
+    if kind == "nearby" then
+      if not settings.friendlyModeEnabled then
+        friendlyCombatants = DismissFromList(friendlyCombatants, name)
+        return
+      end
+
+      TryAppendFriendly(name, unit)
       return
     end
   end

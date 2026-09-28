@@ -1,7 +1,7 @@
 --[[
   OlympusPVP.AddonController
 
-  Slash: /olympus, /opvp
+  Slash: /olympuspvp, /opvp
 ]]
 
 ---@type OlympusPVPNamespace
@@ -28,10 +28,11 @@ function AddonController.Create(dependencies)
 
   local function ShowHelp()
     dependencies.printToChat("[Olympus PVP] Commands:")
-    dependencies.printToChat("/olympus - Open or close settings")
-    dependencies.printToChat("/olympus pvpclear - Clear enemy and friendly frames")
-    dependencies.printToChat("/olympus reset - Reset settings")
-    dependencies.printToChat("/olympus help - Show commands")
+    dependencies.printToChat("/olympuspvp - Open or close settings")
+    dependencies.printToChat("/opvp also works")
+    dependencies.printToChat("/olympuspvp pvpclear - Clear enemy and friendly frames")
+    dependencies.printToChat("/olympuspvp reset - Reset settings")
+    dependencies.printToChat("/olympuspvp help - Show commands")
   end
 
   ---@param input? string
