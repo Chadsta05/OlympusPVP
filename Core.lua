@@ -388,6 +388,7 @@ function Core.CreateScanner(dependencies)
   ---@return OlympusPVPCombatant[]
   local function KeepRecentlySeen(list)
     local now = dependencies.now()
+    local settings = dependencies.getSettings()
     ---@type OlympusPVPCombatant[]
     local nextList = {}
     local index = 1
@@ -400,7 +401,15 @@ function Core.CreateScanner(dependencies)
         if now - seenAt <= SIGHT_STALE_MS then
           nextList[#nextList + 1] = combatant
         else
-          needsInspect.delete(combatant.name)
+          if IsSelfName(combatant.name) then
+            if settings.includeSelfOnFriendly then
+              nextList[#nextList + 1] = combatant
+            else
+              needsInspect.delete(combatant.name)
+            end
+          else
+            needsInspect.delete(combatant.name)
+          end
         end
       else
         needsInspect.delete(combatant.name)
@@ -439,6 +448,16 @@ function Core.CreateScanner(dependencies)
         foe.seenAt = dependencies.now()
       end
 
+      local friend = FindFriendlyCombatant(name)
+
+      if friend then
+        friend.seenAt = dependencies.now()
+      end
+
+      return
+    end
+
+    if IsSelfName(name) then
       local friend = FindFriendlyCombatant(name)
 
       if friend then
@@ -820,12 +839,83 @@ function Core.CreateScanner(dependencies)
 
   ---@param name string
   ---@param unit? string
+  local function PinFriendlyFront(name, unit)
+    local existing = FindFriendlyCombatant(name)
+
+    if existing then
+      RefreshPvpCombatant(existing, existing.name, unit)
+
+      ---@type OlympusPVPCombatant[]
+      local nextList = { existing }
+      local index = 1
+
+      while index <= #friendlyCombatants do
+        if not NamesMatch(friendlyCombatants[index].name, name) then
+          nextList[#nextList + 1] = friendlyCombatants[index]
+        end
+
+        index = index + 1
+      end
+
+      friendlyCombatants = nextList
+      return
+    end
+
+    AppendFriendly(name, unit)
+    PinFriendlyFront(name, unit)
+  end
+
+  ---@param unit? string
+  local function NoteSelfFriendly(unit)
+    local settings = dependencies.getSettings()
+    local playerName = nil
+
+    if dependencies.unitName then
+      if dependencies.unitExists then
+        if dependencies.unitExists("player") then
+          playerName = dependencies.unitName("player")
+        end
+      end
+    end
+
+    if not playerName then
+      if dependencies.getPlayerName then
+        playerName = dependencies.getPlayerName()
+      end
+    end
+
+    if not playerName then
+      return
+    end
+
+    if not settings.friendlyModeEnabled then
+      friendlyCombatants = DismissFromList(friendlyCombatants, playerName)
+      return
+    end
+
+    if not settings.includeSelfOnFriendly then
+      friendlyCombatants = DismissFromList(friendlyCombatants, playerName)
+      return
+    end
+
+    local token = unit
+
+    if not token then
+      token = "player"
+    end
+
+    PinFriendlyFront(playerName, token)
+  end
+
+  ---@param name string
+  ---@param unit? string
   local function NotePvpPlayer(name, unit)
     if not Core.NormalizeName(name) then
       return
     end
 
     if IsSelfName(name) then
+      NoteSelfFriendly(unit)
       return
     end
 
@@ -1100,6 +1190,11 @@ function Core.CreateScanner(dependencies)
 
   ---@param unit string
   local function CheckNearbyPlayer(unit)
+    if unit == "player" then
+      NoteSelfFriendly("player")
+      return
+    end
+
     if not dependencies.unitExists(unit) then
       return
     end
@@ -1261,11 +1356,13 @@ function Core.CreateScanner(dependencies)
     if event == "PLAYER_LOGIN" then
       ClearPvpCombatants()
       wasInBattleground = false
+      NoteSelfFriendly("player")
       return
     end
 
     if event == "PLAYER_ENTERING_WORLD" then
       CheckBattlegroundExit()
+      NoteSelfFriendly("player")
       return
     end
 
@@ -1385,6 +1482,9 @@ function Core.CreateScanner(dependencies)
     DismissFriendlyCombatant = DismissFriendlyCombatant,
     PruneStaleCombatants = PruneStaleCombatants,
     ConfirmClickTarget = ConfirmClickTarget,
+    SyncPlayerFriendly = function()
+      NoteSelfFriendly("player")
+    end,
     IsPvpCombatant = function(name)
       if FindPvpCombatant(name) then
         return true

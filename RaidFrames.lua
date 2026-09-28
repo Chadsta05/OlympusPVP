@@ -231,6 +231,10 @@ local function FindLiveUnit(name, preferred)
     return "target"
   end
 
+  if UnitMatches("player") then
+    return "player"
+  end
+
   if UnitMatches("focus") then
     return "focus"
   end

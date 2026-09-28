@@ -54,6 +54,14 @@ local function Boot()
   function settingsStore.UpdateSettings(changes)
     local nextSettings = originalUpdate(changes)
     OlympusPVPDB.settings = nextSettings
+
+    if OlympusPVP.scanner then
+      if OlympusPVP.scanner.SyncPlayerFriendly then
+        OlympusPVP.scanner.SyncPlayerFriendly()
+      end
+    end
+
+    RefreshFrames()
     return nextSettings
   end
 

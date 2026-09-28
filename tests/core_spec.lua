@@ -62,7 +62,11 @@ describe("OlympusPVP Core", function()
       unitExists = function()
         return true
       end,
-      unitName = function()
+      unitName = function(unit)
+        if unit == "player" then
+          return "Chadsta05"
+        end
+
         return currentUnitName
       end,
       showRaidWarning = function(message)
@@ -323,6 +327,31 @@ describe("OlympusPVP Core", function()
     fixture.scanner.HandleEvent("PLAYER_TARGET_CHANGED")
 
     assert.same({}, Names(fixture.scanner))
+  end)
+
+  it("can pin the local player on the friendly board for heals", function()
+    local fixture = CreateFixture({
+      unitName = "Horde Rogue",
+      settings = {
+        friendlyModeEnabled = true,
+        includeSelfOnFriendly = true,
+      },
+    })
+
+    fixture.scanner.HandleEvent("NAME_PLATE_UNIT_ADDED", { unit = "player" })
+
+    assert.same({ "Chadsta05" }, FriendlyNames(fixture.scanner))
+    assert.same({}, Names(fixture.scanner))
+
+    fixture.scanner.ConfirmClickTarget("Chadsta05")
+    assert.same({ "Chadsta05" }, FriendlyNames(fixture.scanner))
+
+    fixture.store.UpdateSettings({
+      includeSelfOnFriendly = false,
+    })
+    fixture.scanner.SyncPlayerFriendly()
+
+    assert.same({}, FriendlyNames(fixture.scanner))
   end)
 
   it("does not add new enemies while the enemy list is paused", function()

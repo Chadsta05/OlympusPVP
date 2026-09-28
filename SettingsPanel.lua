@@ -34,6 +34,8 @@ function SettingsPanel.Create(dependencies)
   ---@type any?
   local friendlyCheck
   ---@type any?
+  local selfCheck
+  ---@type any?
   local nameInput
   ---@type table
   local nameRows = {}
@@ -115,6 +117,10 @@ function SettingsPanel.Create(dependencies)
       friendlyCheck:SetChecked(settings.friendlyModeEnabled)
     end
 
+    if selfCheck then
+      selfCheck:SetChecked(settings.includeSelfOnFriendly)
+    end
+
     local index = 1
 
     while index <= 12 do
@@ -147,7 +153,7 @@ function SettingsPanel.Create(dependencies)
     end
 
     frame = CreateFrame("Frame", "OlympusPVPSettingsFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(320, 470)
+    frame:SetSize(320, 502)
     frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     frame:SetMovable(true)
     frame:EnableMouse(true)
@@ -221,14 +227,28 @@ function SettingsPanel.Create(dependencies)
       })
     end)
 
+    selfCheck = CreateFrame("CheckButton", "OlympusPVPSelfFriendlyCheck", frame, "UICheckButtonTemplate")
+    selfCheck:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -140)
+    ---@type any?
+    local selfLabel = _G["OlympusPVPSelfFriendlyCheckText"]
+    if selfLabel then
+      selfLabel:SetText("Show yourself (heals)")
+    end
+    selfCheck:SetScript("OnClick", function(self)
+      local checked = self:GetChecked()
+      dependencies.updateSettings({
+        includeSelfOnFriendly = checked == true or checked == 1,
+      })
+    end)
+
     ---@type any
     local gankTitle = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    gankTitle:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -146)
+    gankTitle:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -178)
     gankTitle:SetText("Gank list")
 
     nameInput = CreateFrame("EditBox", "OlympusPVPGankInput", frame, "InputBoxTemplate")
     nameInput:SetSize(200, 22)
-    nameInput:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, -168)
+    nameInput:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, -200)
     nameInput:SetAutoFocus(false)
 
     ---@type any
@@ -254,7 +274,7 @@ function SettingsPanel.Create(dependencies)
     while rowIndex <= 12 do
       ---@type any
       local label = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-      label:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, -200 - ((rowIndex - 1) * 18))
+      label:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, -232 - ((rowIndex - 1) * 18))
       label:SetWidth(230)
       label:SetJustifyH("LEFT")
 

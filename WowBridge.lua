@@ -288,6 +288,7 @@ local function ScanUnitToken(unit, event)
 end
 
 local function ScanVisibleUnits()
+  ScanUnitToken("player", "NAME_PLATE_UNIT_ADDED")
   ScanUnitToken("target", "PLAYER_TARGET_CHANGED")
   ScanUnitToken("focus", "PLAYER_FOCUS_CHANGED")
   ScanUnitToken("mouseover", "UPDATE_MOUSEOVER_UNIT")
