@@ -2,7 +2,8 @@
 ## Title: Olympus PVP
 ## Notes: Sticky PVP raid frames, gank list, and click-to-target. Forever full names.
 ## Author: Chadsta05
-## Version: 1.00
+## Version: 1.19
+## IconTexture: Interface\AddOns\OlympusPVP\icon
 ## SavedVariables: OlympusPVPDB
 
 Types.lua

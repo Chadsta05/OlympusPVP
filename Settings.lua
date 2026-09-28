@@ -17,6 +17,9 @@ local DEFAULT_SETTINGS = {
   soundEnabled = true,
   chatEnabled = true,
   pvpModeEnabled = true,
+  friendlyModeEnabled = false,
+  enemyListPaused = false,
+  friendlyListPaused = false,
   gankNames = {},
 }
 
@@ -47,6 +50,9 @@ function Settings.CreateDefaultSettings()
     soundEnabled = DEFAULT_SETTINGS.soundEnabled,
     chatEnabled = DEFAULT_SETTINGS.chatEnabled,
     pvpModeEnabled = DEFAULT_SETTINGS.pvpModeEnabled,
+    friendlyModeEnabled = DEFAULT_SETTINGS.friendlyModeEnabled,
+    enemyListPaused = DEFAULT_SETTINGS.enemyListPaused,
+    friendlyListPaused = DEFAULT_SETTINGS.friendlyListPaused,
     gankNames = CopyNames(DEFAULT_SETTINGS.gankNames),
   }
 end
@@ -61,6 +67,9 @@ function Settings.CloneSettings(settings)
     soundEnabled = settings.soundEnabled,
     chatEnabled = settings.chatEnabled,
     pvpModeEnabled = settings.pvpModeEnabled,
+    friendlyModeEnabled = settings.friendlyModeEnabled,
+    enemyListPaused = settings.enemyListPaused,
+    friendlyListPaused = settings.friendlyListPaused,
     gankNames = CopyNames(settings.gankNames),
   }
 end
@@ -96,6 +105,18 @@ function Settings.MergeSettings(saved)
 
   if saved.pvpModeEnabled ~= nil then
     merged.pvpModeEnabled = saved.pvpModeEnabled
+  end
+
+  if saved.friendlyModeEnabled ~= nil then
+    merged.friendlyModeEnabled = saved.friendlyModeEnabled
+  end
+
+  if saved.enemyListPaused ~= nil then
+    merged.enemyListPaused = saved.enemyListPaused
+  end
+
+  if saved.friendlyListPaused ~= nil then
+    merged.friendlyListPaused = saved.friendlyListPaused
   end
 
   if saved.gankNames then
@@ -145,6 +166,18 @@ function Settings.CreateSettingsStore(initialSettings)
 
     if changes.pvpModeEnabled ~= nil then
       nextSettings.pvpModeEnabled = changes.pvpModeEnabled
+    end
+
+    if changes.friendlyModeEnabled ~= nil then
+      nextSettings.friendlyModeEnabled = changes.friendlyModeEnabled
+    end
+
+    if changes.enemyListPaused ~= nil then
+      nextSettings.enemyListPaused = changes.enemyListPaused
+    end
+
+    if changes.friendlyListPaused ~= nil then
+      nextSettings.friendlyListPaused = changes.friendlyListPaused
     end
 
     if changes.gankNames ~= nil then

@@ -117,19 +117,43 @@ function TypeGuards.AsPublicString(value)
   return value
 end
 
----Whether value is a finite number (not nan).
+---Whether value is a finite public number (not nan, not a secret client number).
 ---@param value unknown Value to inspect.
 ---@return boolean isFinite
 function TypeGuards.IsFiniteNumber(value)
+  if TypeGuards.IsSecretValue(value) then
+    return false
+  end
+
   if not TypeGuards.IsNumber(value) then
     return false
   end
 
-  if value ~= value then
+  ---@type boolean, boolean
+  local ok, isNan = pcall(function()
+    return value ~= value
+  end)
+
+  if not ok then
+    return false
+  end
+
+  if isNan == true then
     return false
   end
 
   return true
+end
+
+---Return value when it is a finite public number, otherwise nil.
+---@param value unknown Raw API return.
+---@return number? amount
+function TypeGuards.AsPublicNumber(value)
+  if not TypeGuards.IsFiniteNumber(value) then
+    return nil
+  end
+
+  return value
 end
 
 ---@type (fun(message: string))?

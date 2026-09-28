@@ -60,7 +60,7 @@ describe("OlympusPVP AddonController", function()
     fixture.controller.HandleSlashCommand("pvpclear")
 
     assert.are.equal(1, fixture.getClearCount())
-    assert.are.equal("[Olympus PVP] PVP frames cleared.", fixture.chatMessages[1])
+    assert.are.equal("[Olympus PVP] Enemy and friendly frames cleared.", fixture.chatMessages[1])
   end)
 
   it("resets settings", function()

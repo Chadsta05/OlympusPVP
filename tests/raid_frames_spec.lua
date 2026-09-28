@@ -3,6 +3,7 @@ describe("OlympusPVP RaidFrames", function()
     OlympusPVP = nil
     dofile("Types.lua")
     dofile("TypeGuards.lua")
+    dofile("ClassColors.lua")
     dofile("PvpLayout.lua")
     dofile("RaidFrames.lua")
   end)

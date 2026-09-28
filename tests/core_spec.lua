@@ -23,10 +23,27 @@ describe("OlympusPVP Core", function()
     local currentInstanceType = options.instanceType or "none"
     local unitPosition = options.unitPosition
     local unitTargetsPlayer = options.unitTargetsPlayer == true
+    local unitIsPlayer = true
+
+    if options.unitIsPlayer == false then
+      unitIsPlayer = false
+    end
+    local relation = options.relation or {
+      faction = "Horde",
+      playerFaction = "Alliance",
+      reaction = 2,
+      canAttack = true,
+      isEnemy = true,
+      sameFaction = false,
+      inGroup = false,
+    }
     local warnings = {}
     local chatMessages = {}
     local requested = {}
     local queued = {}
+    local inspectByUnit = options.inspectByUnit or {}
+    local skipNameInspect = options.skipNameInspect == true
+    local deathPrompts = {}
 
     local scanner = Core.CreateScanner({
       getZoneText = function()
@@ -67,12 +84,16 @@ describe("OlympusPVP Core", function()
         return "Chadsta05"
       end,
       unitIsPlayer = function()
-        return true
+        return unitIsPlayer
       end,
       unitTargetsPlayer = function()
         return unitTargetsPlayer
       end,
       inspectPvpName = function(name)
+        if skipNameInspect then
+          return nil
+        end
+
         local className = "Warrior"
 
         if string.find(name, "Rogue") then
@@ -86,6 +107,12 @@ describe("OlympusPVP Core", function()
           powerPercent = 45,
         }
       end,
+      inspectPvpUnit = function(unit)
+        return inspectByUnit[unit]
+      end,
+      inspectUnitRelation = function()
+        return relation
+      end,
       queuePvpTarget = function(name)
         queued[#queued + 1] = name
       end,
@@ -98,6 +125,9 @@ describe("OlympusPVP Core", function()
       getInstanceType = function()
         return currentInstanceType
       end,
+      promptDeathGankers = function(names)
+        deathPrompts[#deathPrompts + 1] = names
+      end,
     })
 
     return {
@@ -107,6 +137,7 @@ describe("OlympusPVP Core", function()
       chatMessages = chatMessages,
       requested = requested,
       queued = queued,
+      deathPrompts = deathPrompts,
       setTime = function(time)
         currentTime = time
       end,
@@ -119,7 +150,23 @@ describe("OlympusPVP Core", function()
       setUnitTargetsPlayer = function(value)
         unitTargetsPlayer = value
       end,
+      setRelation = function(nextRelation)
+        relation = nextRelation
+      end,
     }
+  end
+
+  local function FriendlyNames(scanner)
+    local combatants = scanner.GetFriendlyCombatants()
+    local names = {}
+    local index = 1
+
+    while index <= #combatants do
+      names[index] = combatants[index].name
+      index = index + 1
+    end
+
+    return names
   end
 
   local function Names(scanner)
@@ -276,5 +323,235 @@ describe("OlympusPVP Core", function()
     fixture.scanner.HandleEvent("PLAYER_TARGET_CHANGED")
 
     assert.same({}, Names(fixture.scanner))
+  end)
+
+  it("does not add new enemies while the enemy list is paused", function()
+    local fixture = CreateFixture({
+      unitName = "Horde Rogue",
+      settings = {
+        enemyListPaused = true,
+      },
+    })
+
+    fixture.scanner.HandleEvent("PLAYER_TARGET_CHANGED")
+
+    assert.same({}, Names(fixture.scanner))
+  end)
+
+  it("does not add new friendlies while the friendly list is paused", function()
+    local fixture = CreateFixture({
+      unitName = "Tilds Telemand",
+      settings = {
+        friendlyModeEnabled = true,
+        friendlyListPaused = true,
+      },
+      relation = {
+        faction = "Alliance",
+        playerFaction = "Alliance",
+        reaction = 5,
+        canAttack = false,
+        isEnemy = false,
+        sameFaction = true,
+        inGroup = false,
+      },
+    })
+
+    fixture.scanner.HandleEvent("NAME_PLATE_UNIT_ADDED", { unit = "nameplate1" })
+
+    assert.same({}, FriendlyNames(fixture.scanner))
+  end)
+
+  it("drops enemies who have not been seen in range", function()
+    local fixture = CreateFixture({
+      unitName = "Horde Rogue",
+    })
+
+    fixture.scanner.HandleEvent("PLAYER_TARGET_CHANGED")
+    fixture.setTime(12000)
+    fixture.scanner.PruneStaleCombatants()
+
+    assert.same({}, Names(fixture.scanner))
+  end)
+
+  it("keeps paused enemies even when they leave range", function()
+    local fixture = CreateFixture({
+      unitName = "Horde Rogue",
+    })
+
+    fixture.scanner.HandleEvent("PLAYER_TARGET_CHANGED")
+    fixture.store.UpdateSettings({
+      enemyListPaused = true,
+    })
+    fixture.setTime(12000)
+    fixture.scanner.PruneStaleCombatants()
+
+    assert.same({ "Horde Rogue" }, Names(fixture.scanner))
+  end)
+
+  it("removes a frame when a click does not acquire that target", function()
+    local fixture = CreateFixture({
+      unitName = "Horde Rogue",
+    })
+
+    fixture.scanner.HandleEvent("PLAYER_TARGET_CHANGED")
+    fixture.setUnitName("Someone Else")
+    fixture.scanner.ConfirmClickTarget("Horde Rogue")
+
+    assert.same({}, Names(fixture.scanner))
+  end)
+
+  it("keeps same-faction players off the enemy list", function()
+    local fixture = CreateFixture({
+      unitName = "Tilds Telemand",
+      relation = {
+        faction = "Alliance",
+        playerFaction = "Alliance",
+        reaction = 5,
+        canAttack = false,
+        isEnemy = false,
+        sameFaction = true,
+        inGroup = false,
+      },
+    })
+
+    fixture.scanner.HandleEvent("PLAYER_TARGET_CHANGED")
+    fixture.scanner.HandleEvent("NAME_PLATE_UNIT_ADDED", { unit = "nameplate1" })
+
+    assert.same({}, Names(fixture.scanner))
+    assert.same({}, FriendlyNames(fixture.scanner))
+  end)
+
+  it("puts same-faction open-world players on a separate friendly list", function()
+    local fixture = CreateFixture({
+      unitName = "Tilds Telemand",
+      settings = {
+        friendlyModeEnabled = true,
+      },
+      relation = {
+        faction = "Alliance",
+        playerFaction = "Alliance",
+        reaction = 5,
+        canAttack = false,
+        isEnemy = false,
+        sameFaction = true,
+        inGroup = false,
+      },
+    })
+
+    fixture.scanner.HandleEvent("NAME_PLATE_UNIT_ADDED", { unit = "nameplate1" })
+
+    assert.same({}, Names(fixture.scanner))
+    assert.same({ "Tilds Telemand" }, FriendlyNames(fixture.scanner))
+  end)
+
+  it("adds hostile players from nameplates before combat", function()
+    local fixture = CreateFixture({
+      unitName = "Horde Rogue",
+    })
+
+    fixture.scanner.HandleEvent("NAME_PLATE_UNIT_ADDED", { unit = "nameplate1" })
+
+    assert.same({ "Horde Rogue" }, Names(fixture.scanner))
+    assert.same({}, FriendlyNames(fixture.scanner))
+  end)
+
+  it("does not add enemy npcs to targetable frames", function()
+    local fixture = CreateFixture({
+      unitName = "Defias Thug",
+      unitIsPlayer = false,
+    })
+
+    fixture.scanner.HandleEvent("NAME_PLATE_UNIT_ADDED", { unit = "nameplate1" })
+    fixture.scanner.HandleEvent("COMBAT_LOG_EVENT_UNFILTERED", {
+      sourceName = "Defias Thug",
+      destinationName = "Chadsta05",
+      destinationIsSelf = true,
+      isDamage = true,
+    })
+
+    assert.same({}, Names(fixture.scanner))
+  end)
+
+  it("puts incomplete nameplate inspect on a set and fills it from target", function()
+    local fixture = CreateFixture({
+      unitName = "Cat Druid",
+      skipNameInspect = true,
+      inspectByUnit = {
+        target = {
+          className = "Druid",
+          level = 60,
+          healthPercent = 42,
+          powerPercent = 80,
+          powerType = "energy",
+        },
+      },
+    })
+
+    fixture.scanner.HandleEvent("NAME_PLATE_UNIT_ADDED", { unit = "nameplate1" })
+
+    local scanned = fixture.scanner.GetPvpCombatants()[1]
+    assert.is_nil(scanned.className)
+    assert.is_true(fixture.scanner.NeedsInspect("Cat Druid"))
+
+    fixture.scanner.HandleEvent("PLAYER_TARGET_CHANGED")
+
+    local filled = fixture.scanner.GetPvpCombatants()[1]
+    assert.are.equal("Druid", filled.className)
+    assert.are.equal(60, filled.level)
+    assert.are.equal(42, filled.healthPercent)
+    assert.is_false(fixture.scanner.NeedsInspect("Cat Druid"))
+  end)
+
+  it("prompts ganker marks for names that damaged you before death", function()
+    local fixture = CreateFixture()
+
+    fixture.scanner.HandleEvent("COMBAT_LOG_EVENT_UNFILTERED", {
+      sourceName = "Stad Swipe",
+      destinationName = "Chadsta05",
+      destinationIsSelf = true,
+      isDamage = true,
+    })
+    fixture.scanner.HandleEvent("COMBAT_LOG_EVENT_UNFILTERED", {
+      sourceName = "Horde Rogue",
+      destinationName = "Chadsta05",
+      destinationIsSelf = true,
+      isDamage = true,
+    })
+    fixture.scanner.HandleEvent("PLAYER_DEAD")
+
+    assert.same({ { "Horde Rogue", "Stad Swipe" } }, fixture.deathPrompts)
+  end)
+
+  it("prompts from combat-log self death when dest is marked self", function()
+    local fixture = CreateFixture()
+
+    fixture.scanner.HandleEvent("COMBAT_LOG_EVENT_UNFILTERED", {
+      sourceName = "Stad Swipe",
+      destinationIsSelf = true,
+      isDamage = true,
+    })
+    fixture.scanner.HandleEvent("COMBAT_LOG_EVENT_UNFILTERED", {
+      subevent = "UNIT_DIED",
+      destinationIsSelf = true,
+      unitDiedSelf = true,
+    })
+
+    assert.same({ { "Stad Swipe" } }, fixture.deathPrompts)
+  end)
+
+  it("skips death ganker prompts in battlegrounds", function()
+    local fixture = CreateFixture({
+      instanceType = "pvp",
+    })
+
+    fixture.scanner.HandleEvent("COMBAT_LOG_EVENT_UNFILTERED", {
+      sourceName = "Stad Swipe",
+      destinationName = "Chadsta05",
+      destinationIsSelf = true,
+      isDamage = true,
+    })
+    fixture.scanner.HandleEvent("PLAYER_DEAD")
+
+    assert.same({}, fixture.deathPrompts)
   end)
 end)

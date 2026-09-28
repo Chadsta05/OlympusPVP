@@ -9,6 +9,9 @@
 ---@field soundEnabled boolean
 ---@field chatEnabled boolean
 ---@field pvpModeEnabled boolean
+---@field friendlyModeEnabled boolean
+---@field enemyListPaused boolean
+---@field friendlyListPaused boolean
 ---@field gankNames string[]
 
 ---@class PartialOlympusPVPSettings
@@ -18,6 +21,9 @@
 ---@field soundEnabled? boolean
 ---@field chatEnabled? boolean
 ---@field pvpModeEnabled? boolean
+---@field friendlyModeEnabled? boolean
+---@field enemyListPaused? boolean
+---@field friendlyListPaused? boolean
 ---@field gankNames? string[]
 
 ---@class OlympusPVPSettingsStore
@@ -39,6 +45,15 @@
 ---@field y? number
 ---@field mapId? string
 
+---@class OlympusPVPUnitRelation
+---@field faction? string
+---@field playerFaction? string
+---@field reaction? number
+---@field canAttack boolean
+---@field isEnemy boolean
+---@field sameFaction boolean
+---@field inGroup boolean
+
 ---@class OlympusPVPUnitInfo
 ---@field className? string
 ---@field level? number
@@ -54,6 +69,7 @@
 ---@field level? number
 ---@field portraitUrl? string
 ---@field unit? string
+---@field seenAt? number
 ---@field healthPercent number
 ---@field powerPercent number
 ---@field powerType string
@@ -72,8 +88,11 @@
 ---@field destinationName? string
 ---@field sourceIsSelf? boolean
 ---@field destinationIsSelf? boolean
----@field isDamage? boolean
+---@field sourceIsPlayer? boolean
+---@field destinationIsPlayer? boolean
 ---@field subevent? string
+---@field isDamage? boolean
+---@field unitDiedSelf? boolean
 
 ---@alias OlympusPVPEventHandler fun(event: string, payload?: OlympusPVPEventPayload)
 
@@ -94,25 +113,30 @@
 ---@field unitIsPlayer? fun(unit: string): boolean
 ---@field unitTargetsPlayer? fun(unit: string): boolean
 ---@field inspectPvpUnit? fun(unit: string): OlympusPVPUnitInfo?
+---@field inspectUnitRelation? fun(unit: string): OlympusPVPUnitRelation?
 ---@field inspectPvpName? fun(name: string): OlympusPVPUnitInfo?
 ---@field queuePvpTarget? fun(name: string)
 ---@field getUnitPosition? fun(unit: string): OlympusPVPMapPosition?
 ---@field getPlayerFacingDegrees? fun(): number?
----@field getInstanceType? fun(): string?
+---@field promptDeathGankers? fun(names: string[])
 
 ---@class OlympusPVPApi
 ---@field Start fun()
 ---@field HandleEvent OlympusPVPEventHandler
 ---@field NotePvpPlayer fun(name: string, unit?: string)
 ---@field GetPvpCombatants fun(): OlympusPVPCombatant[]
+---@field GetFriendlyCombatants fun(): OlympusPVPCombatant[]
 ---@field ClearPvpCombatants fun()
 ---@field DismissPvpCombatant fun(name: string)
+---@field DismissFriendlyCombatant fun(name: string)
 ---@field IsPvpCombatant fun(name?: string): boolean
 ---@field IsGankTarget fun(name?: string): boolean
 ---@field GetLastGankSighting fun(): OlympusPVPDetection?
 ---@field GetGankPointer fun(): OlympusPVPGankPointer?
 ---@field CheckUnit fun(unit: string, source: string)
 ---@field CheckCombatLog fun(event: OlympusPVPEventPayload)
+---@field NeedsInspect fun(name?: string): boolean
+---@field GetDeathSuspects fun(): string[]
 
 ---@class OlympusPVPNamespace
 ---@field TypeGuards table

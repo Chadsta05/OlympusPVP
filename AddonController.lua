@@ -29,7 +29,7 @@ function AddonController.Create(dependencies)
   local function ShowHelp()
     dependencies.printToChat("[Olympus PVP] Commands:")
     dependencies.printToChat("/olympus - Open or close settings")
-    dependencies.printToChat("/olympus pvpclear - Clear PVP raid frames")
+    dependencies.printToChat("/olympus pvpclear - Clear enemy and friendly frames")
     dependencies.printToChat("/olympus reset - Reset settings")
     dependencies.printToChat("/olympus help - Show commands")
   end
@@ -50,7 +50,7 @@ function AddonController.Create(dependencies)
         dependencies.clearPvpCombatants()
       end
 
-      dependencies.printToChat("[Olympus PVP] PVP frames cleared.")
+      dependencies.printToChat("[Olympus PVP] Enemy and friendly frames cleared.")
       return
     end
 

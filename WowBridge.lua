@@ -12,6 +12,8 @@ OlympusPVP.WowBridge = OlympusPVP.WowBridge or {}
 local WowBridge = OlympusPVP.WowBridge
 ---@type table
 local TypeGuards = OlympusPVP.TypeGuards
+---@type table
+local ClassColors = OlympusPVP.ClassColors
 
 if not TypeGuards then
   error("OlympusPVP.TypeGuards must load before WowBridge")
@@ -59,6 +61,20 @@ local function UnitNameSafe(unit)
     return nil
   end
 
+  if GetUnitName then
+    ---@type boolean, string?
+    local nameOk, displayedName = pcall(GetUnitName, unit, true)
+    if nameOk then
+      local publicDisplayedName = TypeGuards.ExpectPublicString(
+        "UnitNameSafe.GetUnitName",
+        displayedName
+      )
+      if publicDisplayedName then
+        return publicDisplayedName
+      end
+    end
+  end
+
   if UnitName then
     ---@type boolean, string?
     local ok, firstName = pcall(UnitName, unit)
@@ -71,6 +87,56 @@ local function UnitNameSafe(unit)
   return nil
 end
 
+---@param guid unknown
+---@return boolean
+local function GuidLooksLikePlayer(guid)
+  local publicGuid = TypeGuards.AsPublicString(guid)
+
+  if not publicGuid then
+    return false
+  end
+
+  if string.sub(publicGuid, 1, 7) == "Player-" then
+    return true
+  end
+
+  if string.sub(string.lower(publicGuid), 1, 7) == "player-" then
+    return true
+  end
+
+  return false
+end
+
+---@param unit string
+---@return boolean
+local function UnitIsPlayerSafe(unit)
+  if UnitIsPlayer then
+    local playerOk, isPlayer = pcall(UnitIsPlayer, unit)
+
+    if playerOk then
+      if isPlayer == true then
+        return true
+      end
+    end
+  end
+
+  if UnitGUID then
+    local guidOk, guid = pcall(UnitGUID, unit)
+
+    if guidOk then
+      if GuidLooksLikePlayer(guid) then
+        return true
+      end
+    end
+  end
+
+  if not UnitIsPlayer then
+    return true
+  end
+
+  return false
+end
+
 ---@param unit string
 ---@return boolean
 local function UnitExistsSafe(unit)
@@ -79,6 +145,171 @@ local function UnitExistsSafe(unit)
   end
 
   return UnitExists(unit) == true
+end
+
+---@return OlympusPVPMapPosition?
+local function GetPlayerPositionSafe()
+  if C_Map and C_Map.GetBestMapForUnit and C_Map.GetPlayerMapPosition then
+    local mapId = TypeGuards.ExpectFiniteNumber(
+      "C_Map.GetBestMapForUnit",
+      C_Map.GetBestMapForUnit("player")
+    )
+
+    if mapId then
+      local position = TypeGuards.ExpectRecord(
+        "C_Map.GetPlayerMapPosition",
+        C_Map.GetPlayerMapPosition(mapId, "player")
+      )
+
+      if position then
+        if position.GetXY then
+          local x, y = position:GetXY()
+
+          local publicX = TypeGuards.AsPublicNumber(x)
+          local publicY = TypeGuards.AsPublicNumber(y)
+
+          if publicX then
+            if publicY then
+              return {
+                x = math.floor(publicX * 10000 + 0.5) / 100,
+                y = math.floor(publicY * 10000 + 0.5) / 100,
+                mapId = tostring(mapId),
+              }
+            end
+          end
+        end
+      end
+    end
+  end
+
+  return nil
+end
+
+---@param unit string
+---@return OlympusPVPMapPosition?
+local function GetUnitPositionSafe(unit)
+  if not TypeGuards.ExpectPublicString("GetUnitPositionSafe.unit", unit) then
+    return nil
+  end
+
+  if C_Map and C_Map.GetBestMapForUnit and C_Map.GetPlayerMapPosition then
+    local mapId = TypeGuards.ExpectFiniteNumber(
+      "C_Map.GetBestMapForUnit.unit",
+      C_Map.GetBestMapForUnit("player")
+    )
+
+    if mapId then
+      local position = C_Map.GetPlayerMapPosition(mapId, unit)
+
+      if position then
+        if position.GetXY then
+          local x, y = position:GetXY()
+
+          local publicX = TypeGuards.AsPublicNumber(x)
+          local publicY = TypeGuards.AsPublicNumber(y)
+
+          if publicX then
+            if publicY then
+              return {
+                x = math.floor(publicX * 10000 + 0.5) / 100,
+                y = math.floor(publicY * 10000 + 0.5) / 100,
+                mapId = tostring(mapId),
+              }
+            end
+          end
+        end
+      end
+    end
+  end
+
+  return nil
+end
+
+---@return number
+local function GetPlayerFacingDegreesSafe()
+  if not GetPlayerFacing then
+    return 0
+  end
+
+  local facing = TypeGuards.AsPublicNumber(GetPlayerFacing())
+
+  if not facing then
+    return 0
+  end
+
+  local ok, clockwise = pcall(function()
+    return (360 - math.deg(facing)) % 360
+  end)
+
+  if not ok then
+    return 0
+  end
+
+  if not TypeGuards.IsFiniteNumber(clockwise) then
+    return 0
+  end
+
+  return clockwise
+end
+
+---@type number
+local SCAN_INTERVAL_SECONDS = 0.5
+---@type number
+local scanElapsed = 0
+---@type number
+local MAX_NAMEPLATES = 40
+---@type (fun())?
+local uiRefresh
+
+local function ScanUnitToken(unit, event)
+  if not eventHandler then
+    return
+  end
+
+  if not UnitExistsSafe(unit) then
+    return
+  end
+
+  if event == "NAME_PLATE_UNIT_ADDED" then
+    eventHandler(event, {
+      unit = unit,
+    })
+    return
+  end
+
+  eventHandler(event, {})
+end
+
+local function ScanVisibleUnits()
+  ScanUnitToken("target", "PLAYER_TARGET_CHANGED")
+  ScanUnitToken("mouseover", "UPDATE_MOUSEOVER_UNIT")
+  ScanUnitToken("focus", "PLAYER_FOCUS_CHANGED")
+
+  local index = 1
+
+  while index <= MAX_NAMEPLATES do
+    ScanUnitToken("nameplate" .. tostring(index), "NAME_PLATE_UNIT_ADDED")
+    index = index + 1
+  end
+end
+
+local function OnUpdate(_, elapsed)
+  if type(elapsed) ~= "number" then
+    return
+  end
+
+  scanElapsed = scanElapsed + elapsed
+
+  if scanElapsed < SCAN_INTERVAL_SECONDS then
+    return
+  end
+
+  scanElapsed = 0
+  ScanVisibleUnits()
+
+  if uiRefresh then
+    uiRefresh()
+  end
 end
 
 ---@return string
@@ -104,46 +335,96 @@ local function InspectPvpUnit(unit)
   end
 
   local className = nil
+  local powerTypeName = nil
 
   if UnitClass then
-    local _, classFile = UnitClass(unit)
+    local classOk, localizedName, classFile = pcall(UnitClass, unit)
 
-    if type(classFile) == "string" then
-      className = classFile
+    if classOk then
+      className = TypeGuards.AsPublicString(classFile)
+
+      if not className then
+        className = TypeGuards.AsPublicString(localizedName)
+      end
     end
   end
 
   local level = nil
 
   if UnitLevel then
-    local unitLevel = UnitLevel(unit)
+    local levelOk, unitLevel = pcall(UnitLevel, unit)
 
-    if type(unitLevel) == "number" then
-      level = unitLevel
+    if levelOk then
+      level = TypeGuards.AsPublicNumber(unitLevel)
     end
+  end
+
+  ---@param currentFn function
+  ---@param maxFn function
+  ---@param powerIndex? number
+  ---@return number
+  local function UnitResourcePercent(currentFn, maxFn, powerIndex)
+    local ok, percent = pcall(function()
+      local maxValue
+      local currentValue
+
+      if powerIndex then
+        maxValue = TypeGuards.AsPublicNumber(maxFn(unit, powerIndex))
+        currentValue = TypeGuards.AsPublicNumber(currentFn(unit, powerIndex))
+      else
+        maxValue = TypeGuards.AsPublicNumber(maxFn(unit))
+        currentValue = TypeGuards.AsPublicNumber(currentFn(unit))
+      end
+
+      if not maxValue then
+        return 100
+      end
+
+      if not currentValue then
+        return 100
+      end
+
+      if maxValue <= 0 then
+        return 100
+      end
+
+      return (currentValue / maxValue) * 100
+    end)
+
+    if not ok then
+      return 100
+    end
+
+    if not TypeGuards.IsFiniteNumber(percent) then
+      return 100
+    end
+
+    return percent
   end
 
   local healthPercent = 100
   local powerPercent = 100
+  local powerIndex = nil
 
-  if UnitHealth and UnitHealthMax then
-    local maxHealth = UnitHealthMax(unit)
+  if UnitPowerType then
+    local powerOk, typeIndex, typeToken = pcall(UnitPowerType, unit)
 
-    if type(maxHealth) == "number" then
-      if maxHealth > 0 then
-        healthPercent = (UnitHealth(unit) / maxHealth) * 100
+    if powerOk then
+      powerIndex = TypeGuards.AsPublicNumber(typeIndex)
+      local publicToken = TypeGuards.AsPublicString(typeToken)
+
+      if publicToken then
+        powerTypeName = string.lower(publicToken)
       end
     end
   end
 
-  if UnitPower and UnitPowerMax then
-    local maxPower = UnitPowerMax(unit)
+  if UnitHealth and UnitHealthMax then
+    healthPercent = UnitResourcePercent(UnitHealth, UnitHealthMax)
+  end
 
-    if type(maxPower) == "number" then
-      if maxPower > 0 then
-        powerPercent = (UnitPower(unit) / maxPower) * 100
-      end
-    end
+  if UnitPower and UnitPowerMax then
+    powerPercent = UnitResourcePercent(UnitPower, UnitPowerMax, powerIndex)
   end
 
   return {
@@ -151,6 +432,7 @@ local function InspectPvpUnit(unit)
     level = level,
     healthPercent = healthPercent,
     powerPercent = powerPercent,
+    powerType = powerTypeName,
   }
 end
 
@@ -162,6 +444,105 @@ local function UnitTargetsPlayer(unit)
   end
 
   return UnitIsUnit(unit .. "target", "player") == true
+end
+
+---@param unit string
+---@return OlympusPVPUnitRelation?
+local function InspectUnitRelation(unit)
+  if not TypeGuards.ExpectPublicString("InspectUnitRelation.unit", unit) then
+    return nil
+  end
+
+  local playerFaction = nil
+  local faction = nil
+
+  if UnitFactionGroup then
+    local playerOk, playerValue = pcall(UnitFactionGroup, "player")
+
+    if playerOk then
+      playerFaction = TypeGuards.AsPublicString(playerValue)
+    end
+
+    local unitOk, unitValue = pcall(UnitFactionGroup, unit)
+
+    if unitOk then
+      faction = TypeGuards.AsPublicString(unitValue)
+    end
+  end
+
+  local reaction = nil
+
+  if UnitReaction then
+    local reactionOk, reactionValue = pcall(UnitReaction, "player", unit)
+
+    if reactionOk then
+      reaction = TypeGuards.AsPublicNumber(reactionValue)
+    end
+  end
+
+  local canAttack = false
+
+  if UnitCanAttack then
+    local attackOk, attackValue = pcall(UnitCanAttack, "player", unit)
+
+    if attackOk then
+      canAttack = attackValue == true
+    end
+  end
+
+  local isEnemy = false
+
+  if UnitIsEnemy then
+    local enemyOk, enemyValue = pcall(UnitIsEnemy, "player", unit)
+
+    if enemyOk then
+      isEnemy = enemyValue == true
+    end
+  end
+
+  local inGroup = false
+
+  if UnitInParty then
+    local partyOk, partyValue = pcall(UnitInParty, unit)
+
+    if partyOk then
+      if partyValue == true then
+        inGroup = true
+      else
+        if partyValue == 1 then
+          inGroup = true
+        end
+      end
+    end
+  end
+
+  if UnitInRaid then
+    local raidOk, raidValue = pcall(UnitInRaid, unit)
+
+    if raidOk then
+      if raidValue then
+        inGroup = true
+      end
+    end
+  end
+
+  local sameFaction = false
+
+  if playerFaction then
+    if faction then
+      sameFaction = playerFaction == faction
+    end
+  end
+
+  return {
+    faction = faction,
+    playerFaction = playerFaction,
+    reaction = reaction,
+    canAttack = canAttack,
+    isEnemy = isEnemy,
+    sameFaction = sameFaction,
+    inGroup = inGroup,
+  }
 end
 
 local function RequestTarget(name)
@@ -181,24 +562,222 @@ local function NowMs()
   return time() * 1000
 end
 
+---@param flags unknown
+---@param mask number
+---@return boolean
+local function CombatFlagSet(flags, mask)
+  local publicFlags = TypeGuards.AsPublicNumber(flags)
+
+  if not publicFlags then
+    return false
+  end
+
+  return (math.floor(publicFlags / mask) % 2) == 1
+end
+
+---@param guid unknown
+---@return boolean
+local function GuidIsUnitPlayer(guid)
+  if not guid then
+    return false
+  end
+
+  if not UnitGUID then
+    return false
+  end
+
+  local guidOk, playerGuid = pcall(UnitGUID, "player")
+
+  if not guidOk then
+    return false
+  end
+
+  local publicGuid = TypeGuards.AsPublicString(guid)
+  local publicPlayer = TypeGuards.AsPublicString(playerGuid)
+
+  if publicGuid then
+    if publicPlayer then
+      return publicGuid == publicPlayer
+    end
+  end
+
+  local equalOk, equal = pcall(function()
+    return guid == playerGuid
+  end)
+
+  if not equalOk then
+    return false
+  end
+
+  return equal == true
+end
+
+---@param guid unknown
+---@return string?
+local function NameFromPlayerGuid(guid)
+  local publicGuid = TypeGuards.AsPublicString(guid)
+
+  if not publicGuid then
+    return nil
+  end
+
+  if not GetPlayerInfoByGUID then
+    return nil
+  end
+
+  local infoOk, _, _, _, _, _, playerName = pcall(GetPlayerInfoByGUID, publicGuid)
+
+  if not infoOk then
+    return nil
+  end
+
+  return TypeGuards.AsPublicString(playerName)
+end
+
+---@param name unknown
+---@param guid unknown
+---@return string?
+local function CombatLogName(name, guid)
+  local publicName = TypeGuards.AsPublicString(name)
+
+  if publicName then
+    return publicName
+  end
+
+  return NameFromPlayerGuid(guid)
+end
+
 ---@param ... unknown
 ---@return OlympusPVPEventPayload
 local function BuildCombatLogPayload(...)
   local args = { ... }
+  ---@type unknown
+  local subeventRaw
+  ---@type unknown
+  local sourceGuid
+  ---@type unknown
+  local sourceNameRaw
+  ---@type unknown
+  local sourceFlags
+  ---@type unknown
+  local destGuid
+  ---@type unknown
+  local destNameRaw
+  ---@type unknown
+  local destFlags
 
   if CombatLogGetCurrentEventInfo then
-    local _, subevent, _, _, sourceName, _, _, _, destinationName = CombatLogGetCurrentEventInfo()
+    local _, eventName, third, fourth, fifth, sixth, seventh, eighth, ninth, tenth =
+      CombatLogGetCurrentEventInfo()
 
-    return {
-      sourceName = TypeGuards.ExpectPublicString("CombatLog.sourceName", sourceName),
-      destinationName = TypeGuards.ExpectPublicString("CombatLog.destinationName", destinationName),
-      subevent = TypeGuards.ExpectPublicString("CombatLog.subevent", subevent),
-    }
+    subeventRaw = eventName
+
+    if TypeGuards.IsBoolean(third) then
+      sourceGuid = fourth
+      sourceNameRaw = fifth
+      sourceFlags = sixth
+      destGuid = eighth
+      destNameRaw = ninth
+      destFlags = tenth
+    else
+      if GuidLooksLikePlayer(third) then
+        sourceGuid = third
+        sourceNameRaw = fourth
+        sourceFlags = fifth
+        destGuid = sixth
+        destNameRaw = seventh
+        destFlags = eighth
+      else
+        local thirdText = TypeGuards.AsPublicString(third)
+
+        if thirdText then
+          if string.find(thirdText, "-", 1, true) then
+            sourceGuid = third
+            sourceNameRaw = fourth
+            sourceFlags = fifth
+            destGuid = sixth
+            destNameRaw = seventh
+            destFlags = eighth
+          else
+            sourceGuid = fourth
+            sourceNameRaw = fifth
+            sourceFlags = sixth
+            destGuid = eighth
+            destNameRaw = ninth
+            destFlags = tenth
+          end
+        else
+          sourceGuid = fourth
+          sourceNameRaw = fifth
+          sourceFlags = sixth
+          destGuid = eighth
+          destNameRaw = ninth
+          destFlags = tenth
+        end
+      end
+    end
+  else
+    subeventRaw = args[2]
+    sourceGuid = args[4]
+    sourceNameRaw = args[5]
+    sourceFlags = args[6]
+    destGuid = args[8]
+    destNameRaw = args[9]
+    destFlags = args[10]
+  end
+
+  ---@type number
+  local affiliationMine = 1
+  ---@type number
+  local typePlayer = 1024
+  local sourceName = CombatLogName(sourceNameRaw, sourceGuid)
+  local destinationName = CombatLogName(destNameRaw, destGuid)
+  local subevent = TypeGuards.AsPublicString(subeventRaw)
+  local destinationIsSelf = GuidIsUnitPlayer(destGuid)
+
+  if not destinationIsSelf then
+    destinationIsSelf = CombatFlagSet(destFlags, affiliationMine)
+  end
+
+  local sourceIsSelf = GuidIsUnitPlayer(sourceGuid)
+
+  if not sourceIsSelf then
+    sourceIsSelf = CombatFlagSet(sourceFlags, affiliationMine)
+  end
+
+  local sourceIsPlayer = GuidLooksLikePlayer(sourceGuid)
+
+  if not sourceIsPlayer then
+    sourceIsPlayer = CombatFlagSet(sourceFlags, typePlayer)
+  end
+
+  local destinationIsPlayer = GuidLooksLikePlayer(destGuid)
+
+  if not destinationIsPlayer then
+    destinationIsPlayer = CombatFlagSet(destFlags, typePlayer)
+  end
+
+  local unitDiedSelf = false
+
+  if destinationIsSelf then
+    if subevent == "UNIT_DIED" then
+      unitDiedSelf = true
+    else
+      if subevent == "UNIT_DESTROYED" then
+        unitDiedSelf = true
+      end
+    end
   end
 
   return {
-    sourceName = TypeGuards.ExpectPublicString("CombatLog.sourceName", args[5] or args[4]),
-    destinationName = TypeGuards.ExpectPublicString("CombatLog.destinationName", args[8] or args[9]),
+    sourceName = sourceName,
+    destinationName = destinationName,
+    sourceIsSelf = sourceIsSelf,
+    destinationIsSelf = destinationIsSelf,
+    sourceIsPlayer = sourceIsPlayer,
+    destinationIsPlayer = destinationIsPlayer,
+    subevent = subevent,
+    unitDiedSelf = unitDiedSelf,
   }
 end
 
@@ -224,9 +803,29 @@ local function OnEvent(_, event, ...)
     end
   elseif event == "COMBAT_LOG_EVENT_UNFILTERED" then
     payload = BuildCombatLogPayload(...)
+  elseif event == "PLAYER_REGEN_ENABLED" then
+    if uiRefresh then
+      uiRefresh()
+    end
+  end
+
+  if event == "PLAYER_LOGIN" then
+    if GetCVar then
+      if GetCVar("nameplateShowEnemies") == "0" then
+        PrintToChat(
+          "[Olympus PVP] Enemy nameplates help the scanner. Press V / Shift+V if frames are empty."
+        )
+      end
+    end
   end
 
   eventHandler(event, payload)
+
+  if uiRefresh then
+    if event ~= "PLAYER_REGEN_ENABLED" then
+      uiRefresh()
+    end
+  end
 end
 
 ---@param event string
@@ -238,12 +837,17 @@ local function RegisterEvent(event, handler)
     if CreateFrame then
       eventFrame = CreateFrame("Frame", "OlympusPVPEventFrame")
       eventFrame:SetScript("OnEvent", OnEvent)
+      eventFrame:SetScript("OnUpdate", OnUpdate)
     end
   end
 
   if eventFrame then
     eventFrame:RegisterEvent(event)
   end
+end
+
+function WowBridge.SetUiRefresh(callback)
+  uiRefresh = callback
 end
 
 ---@param handler fun(input?: string)
@@ -280,9 +884,9 @@ function WowBridge.CreateDependencies()
 
       return nil
     end,
-    getPlayerPosition = function()
-      return nil
-    end,
+    getPlayerPosition = GetPlayerPositionSafe,
+    getUnitPosition = GetUnitPositionSafe,
+    getPlayerFacingDegrees = GetPlayerFacingDegreesSafe,
     unitExists = UnitExistsSafe,
     unitName = UnitNameSafe,
     showRaidWarning = ShowRaidWarning,
@@ -294,15 +898,10 @@ function WowBridge.CreateDependencies()
     getPlayerName = function()
       return UnitNameSafe("player")
     end,
-    unitIsPlayer = function(unit)
-      if not UnitIsPlayer then
-        return true
-      end
-
-      return UnitIsPlayer(unit) == true
-    end,
+    unitIsPlayer = UnitIsPlayerSafe,
     unitTargetsPlayer = UnitTargetsPlayer,
     inspectPvpUnit = InspectPvpUnit,
+    inspectUnitRelation = InspectUnitRelation,
     getInstanceType = GetInstanceTypeSafe,
     registerSlashCommand = RegisterSlashCommand,
   }

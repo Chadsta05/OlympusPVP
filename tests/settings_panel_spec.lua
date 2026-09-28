@@ -23,6 +23,9 @@ describe("OlympusPVP SettingsPanel", function()
 
     assert.same({ "Stad Swipe" }, store.GetSettings().gankNames)
 
+    panel.PromptDeathGankers({ "Cat Druid" })
+    assert.same({ "Cat Druid" }, panel.lastDeathPrompt)
+
     panel.RemoveGank("Stad Swipe")
 
     assert.same({}, store.GetSettings().gankNames)

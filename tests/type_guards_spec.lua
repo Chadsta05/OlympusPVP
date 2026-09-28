@@ -20,4 +20,14 @@ describe("OlympusPVP TypeGuards", function()
 
     assert.is_nil(TypeGuards.AsPublicString("SECRET"))
   end)
+
+  it("rejects secret numbers so health compares cannot taint", function()
+    _G.issecretvalue = function(value)
+      return value == 999
+    end
+
+    assert.is_false(TypeGuards.IsFiniteNumber(999))
+    assert.is_nil(TypeGuards.AsPublicNumber(999))
+    assert.are.equal(12, TypeGuards.AsPublicNumber(12))
+  end)
 end)

@@ -10,20 +10,32 @@ OlympusPVP.PvpLayout = OlympusPVP.PvpLayout or {}
 local PvpLayout = OlympusPVP.PvpLayout
 
 PvpLayout.COLUMN_SIZE = 5
+PvpLayout.WIDE_COLUMN_SIZE = 10
+PvpLayout.WIDE_AT_COUNT = 15
 PvpLayout.FRAME_BASE_PX = 48
-PvpLayout.FRAME_STEP_PX = 10
-PvpLayout.FRAME_MIN_PX = 18
+PvpLayout.FRAME_STEP_PX = 12
+PvpLayout.FRAME_MIN_PX = 22
 PvpLayout.FRAME_GAP_PX = 3
 PvpLayout.FRAME_BASE_WIDTH_PX = 176
 
 ---@param count number
 ---@return number
+function PvpLayout.ColumnSize(count)
+  if count >= PvpLayout.WIDE_AT_COUNT then
+    return PvpLayout.WIDE_COLUMN_SIZE
+  end
+
+  return PvpLayout.COLUMN_SIZE
+end
+
+---@param count number
+---@return number
 function PvpLayout.ScaleTier(count)
-  if count < 1 then
+  if count < PvpLayout.WIDE_AT_COUNT then
     return 0
   end
 
-  return math.floor((count - 1) / 10)
+  return math.floor((count - PvpLayout.WIDE_AT_COUNT) / 10) + 1
 end
 
 ---@param count number
@@ -55,6 +67,7 @@ end
 ---@return number
 function PvpLayout.GridHeightPx(count)
   local frame = PvpLayout.FrameSizePx(count)
+  local columnSize = PvpLayout.ColumnSize(count)
 
-  return PvpLayout.COLUMN_SIZE * frame + (PvpLayout.COLUMN_SIZE - 1) * PvpLayout.FRAME_GAP_PX
+  return columnSize * frame + (columnSize - 1) * PvpLayout.FRAME_GAP_PX
 end

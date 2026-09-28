@@ -32,7 +32,15 @@ local function RefreshFrames()
     return
   end
 
+  if OlympusPVP.scanner.PruneStaleCombatants then
+    OlympusPVP.scanner.PruneStaleCombatants()
+  end
+
   RaidFrames.Refresh(OlympusPVP.scanner.GetPvpCombatants())
+
+  if OlympusPVP.scanner.GetFriendlyCombatants then
+    RaidFrames.RefreshFriendly(OlympusPVP.scanner.GetFriendlyCombatants())
+  end
 end
 
 local function Boot()
@@ -68,16 +76,74 @@ local function Boot()
     RefreshFrames()
   end
 
+  if WowBridge.SetUiRefresh then
+    WowBridge.SetUiRefresh(RefreshFrames)
+  end
+
   local scanner = Core.CreateScanner(dependencies)
+
+  RaidFrames.SetOnDismiss(function(name)
+    scanner.DismissPvpCombatant(name)
+    RefreshFrames()
+  end)
+
+  if RaidFrames.SetOnFriendlyDismiss then
+    RaidFrames.SetOnFriendlyDismiss(function(name)
+      scanner.DismissFriendlyCombatant(name)
+      RefreshFrames()
+    end)
+  end
+
+  if RaidFrames.SetOnClickTarget then
+    RaidFrames.SetOnClickTarget(function(name)
+      if scanner.ConfirmClickTarget then
+        scanner.ConfirmClickTarget(name)
+      end
+
+      RefreshFrames()
+    end)
+  end
+
+  if RaidFrames.SetPauseControl then
+    RaidFrames.SetPauseControl({
+      getPaused = function()
+        return settingsStore.GetSettings().enemyListPaused == true
+      end,
+      setPaused = function(paused)
+        settingsStore.UpdateSettings({
+          enemyListPaused = paused == true,
+        })
+      end,
+    }, {
+      getPaused = function()
+        return settingsStore.GetSettings().friendlyListPaused == true
+      end,
+      setPaused = function(paused)
+        settingsStore.UpdateSettings({
+          friendlyListPaused = paused == true,
+        })
+      end,
+    })
+  end
 
   local settingsPanel = SettingsPanel.Create({
     getSettings = settingsStore.GetSettings,
     updateSettings = settingsStore.UpdateSettings,
   })
 
+  dependencies.promptDeathGankers = function(names)
+    settingsPanel.PromptDeathGankers(names)
+  end
+
   local controller = AddonController.Create({
     settingsPanel = settingsPanel,
-    resetSettings = settingsStore.ResetSettings,
+    resetSettings = function()
+      settingsStore.ResetSettings()
+
+      if settingsPanel.Refresh then
+        settingsPanel.Refresh()
+      end
+    end,
     printToChat = dependencies.printToChat,
     clearPvpCombatants = function()
       scanner.ClearPvpCombatants()
@@ -95,6 +161,7 @@ local function Boot()
   end
 
   scanner.Start()
+  RefreshFrames()
 end
 
 if CreateFrame then

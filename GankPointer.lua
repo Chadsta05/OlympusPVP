@@ -49,9 +49,6 @@ function GankPointer.NeedleRotationDegrees(playerFacingDegrees, targetBearingDeg
   return relative
 end
 
----@param x number
----@param y number
----@return string
 ---@param value number
 ---@return string
 local function OneDecimal(value)
