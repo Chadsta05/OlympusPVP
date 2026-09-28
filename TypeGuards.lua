@@ -47,6 +47,21 @@ function TypeGuards.IsBoolean(value)
   return TypeGuards.SafeType(value) == "boolean"
 end
 
+---Whether a WoW API flag is set. Classic returns 1/nil, not true/false.
+---@param value unknown API return.
+---@return boolean isSet
+function TypeGuards.IsWowTruthy(value)
+  if value == true then
+    return true
+  end
+
+  if value == 1 then
+    return true
+  end
+
+  return false
+end
+
 ---Whether value is a Lua function.
 ---@param value unknown Value to inspect.
 ---@return boolean isFunction
@@ -75,7 +90,7 @@ function TypeGuards.IsSecretValue(value)
     return false
   end
 
-  return isSecret == true
+  return TypeGuards.IsWowTruthy(isSecret)
 end
 
 ---Compare a string against empty. Callers must pcall this for secret strings.

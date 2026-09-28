@@ -114,7 +114,7 @@ local function UnitIsPlayerSafe(unit)
     local playerOk, isPlayer = pcall(UnitIsPlayer, unit)
 
     if playerOk then
-      if isPlayer == true then
+      if TypeGuards.IsWowTruthy(isPlayer) then
         return true
       end
     end
@@ -144,7 +144,7 @@ local function UnitExistsSafe(unit)
     return false
   end
 
-  return UnitExists(unit) == true
+  return TypeGuards.IsWowTruthy(UnitExists(unit))
 end
 
 ---@return OlympusPVPMapPosition?
@@ -253,7 +253,7 @@ local function GetPlayerFacingDegreesSafe()
 end
 
 ---@type number
-local SCAN_INTERVAL_SECONDS = 0.5
+local SCAN_INTERVAL_SECONDS = 0.2
 ---@type number
 local scanElapsed = 0
 ---@type number
@@ -277,18 +277,35 @@ local function ScanUnitToken(unit, event)
     return
   end
 
+  if event == "UNIT_TARGET" then
+    eventHandler(event, {
+      unit = unit,
+    })
+    return
+  end
+
   eventHandler(event, {})
 end
 
 local function ScanVisibleUnits()
   ScanUnitToken("target", "PLAYER_TARGET_CHANGED")
-  ScanUnitToken("mouseover", "UPDATE_MOUSEOVER_UNIT")
   ScanUnitToken("focus", "PLAYER_FOCUS_CHANGED")
+  ScanUnitToken("mouseover", "UPDATE_MOUSEOVER_UNIT")
 
   local index = 1
 
   while index <= MAX_NAMEPLATES do
-    ScanUnitToken("nameplate" .. tostring(index), "NAME_PLATE_UNIT_ADDED")
+    local unit = "nameplate" .. tostring(index)
+    ScanUnitToken(unit, "NAME_PLATE_UNIT_ADDED")
+
+    if eventHandler then
+      if UnitExistsSafe(unit) then
+        eventHandler("UNIT_TARGET", {
+          unit = unit,
+        })
+      end
+    end
+
     index = index + 1
   end
 end
@@ -362,48 +379,60 @@ local function InspectPvpUnit(unit)
   ---@param currentFn function
   ---@param maxFn function
   ---@param powerIndex? number
-  ---@return number
+  ---@return number?
   local function UnitResourcePercent(currentFn, maxFn, powerIndex)
     local ok, percent = pcall(function()
       local maxValue
       local currentValue
 
       if powerIndex then
-        maxValue = TypeGuards.AsPublicNumber(maxFn(unit, powerIndex))
-        currentValue = TypeGuards.AsPublicNumber(currentFn(unit, powerIndex))
+        maxValue = maxFn(unit, powerIndex)
+        currentValue = currentFn(unit, powerIndex)
       else
-        maxValue = TypeGuards.AsPublicNumber(maxFn(unit))
-        currentValue = TypeGuards.AsPublicNumber(currentFn(unit))
+        maxValue = maxFn(unit)
+        currentValue = currentFn(unit)
       end
 
-      if not maxValue then
-        return 100
+      local publicMax = TypeGuards.AsPublicNumber(maxValue)
+      local publicCurrent = TypeGuards.AsPublicNumber(currentValue)
+
+      if publicMax then
+        if publicCurrent then
+          if publicMax <= 0 then
+            return nil
+          end
+
+          return (publicCurrent / publicMax) * 100
+        end
       end
 
-      if not currentValue then
-        return 100
+      local ratio = currentValue / maxValue
+      local publicRatio = TypeGuards.AsPublicNumber(ratio)
+
+      if publicRatio then
+        return publicRatio * 100
       end
 
-      if maxValue <= 0 then
-        return 100
+      if TypeGuards.IsFiniteNumber(ratio) then
+        return ratio * 100
       end
 
-      return (currentValue / maxValue) * 100
+      return nil
     end)
 
     if not ok then
-      return 100
+      return nil
     end
 
     if not TypeGuards.IsFiniteNumber(percent) then
-      return 100
+      return nil
     end
 
     return percent
   end
 
-  local healthPercent = 100
-  local powerPercent = 100
+  local healthPercent = nil
+  local powerPercent = nil
   local powerIndex = nil
 
   if UnitPowerType then
@@ -443,7 +472,7 @@ local function UnitTargetsPlayer(unit)
     return false
   end
 
-  return UnitIsUnit(unit .. "target", "player") == true
+  return TypeGuards.IsWowTruthy(UnitIsUnit(unit .. "target", "player"))
 end
 
 ---@param unit string
@@ -486,7 +515,7 @@ local function InspectUnitRelation(unit)
     local attackOk, attackValue = pcall(UnitCanAttack, "player", unit)
 
     if attackOk then
-      canAttack = attackValue == true
+      canAttack = TypeGuards.IsWowTruthy(attackValue)
     end
   end
 
@@ -496,7 +525,7 @@ local function InspectUnitRelation(unit)
     local enemyOk, enemyValue = pcall(UnitIsEnemy, "player", unit)
 
     if enemyOk then
-      isEnemy = enemyValue == true
+      isEnemy = TypeGuards.IsWowTruthy(enemyValue)
     end
   end
 
@@ -506,12 +535,8 @@ local function InspectUnitRelation(unit)
     local partyOk, partyValue = pcall(UnitInParty, unit)
 
     if partyOk then
-      if partyValue == true then
+      if TypeGuards.IsWowTruthy(partyValue) then
         inGroup = true
-      else
-        if partyValue == 1 then
-          inGroup = true
-        end
       end
     end
   end
@@ -812,9 +837,15 @@ local function OnEvent(_, event, ...)
   eventHandler(event, payload)
 
   if uiRefresh then
-    if event ~= "PLAYER_REGEN_ENABLED" then
-      uiRefresh()
+    if event == "COMBAT_LOG_EVENT_UNFILTERED" then
+      return
     end
+
+    if event == "PLAYER_REGEN_ENABLED" then
+      return
+    end
+
+    uiRefresh()
   end
 end
 
@@ -823,17 +854,21 @@ end
 local function RegisterEvent(event, handler)
   eventHandler = handler
 
-  if not eventFrame then
-    if CreateFrame then
-      eventFrame = CreateFrame("Frame", "OlympusPVPEventFrame")
-      eventFrame:SetScript("OnEvent", OnEvent)
-      eventFrame:SetScript("OnUpdate", OnUpdate)
-    end
+  if not CreateFrame then
+    return
   end
 
-  if eventFrame then
-    eventFrame:RegisterEvent(event)
+  if string.sub(event, 1, 5) == "UNIT_" then
+    return
   end
+
+  if not eventFrame then
+    eventFrame = CreateFrame("Frame", "OlympusPVPEventFrame")
+    eventFrame:SetScript("OnEvent", OnEvent)
+    eventFrame:SetScript("OnUpdate", OnUpdate)
+  end
+
+  eventFrame:RegisterEvent(event)
 end
 
 function WowBridge.SetUiRefresh(callback)

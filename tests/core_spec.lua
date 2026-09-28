@@ -455,6 +455,34 @@ describe("OlympusPVP Core", function()
     assert.same({}, FriendlyNames(fixture.scanner))
   end)
 
+  it("updates listed health when the nameplate unit changes", function()
+    local inspectByUnit = {
+      nameplate1 = {
+        className = "Rogue",
+        healthPercent = 80,
+        powerPercent = 50,
+        powerType = "energy",
+      },
+    }
+    local fixture = CreateFixture({
+      unitName = "Horde Rogue",
+      inspectByUnit = inspectByUnit,
+    })
+
+    fixture.scanner.HandleEvent("NAME_PLATE_UNIT_ADDED", { unit = "nameplate1" })
+    inspectByUnit.nameplate1 = {
+      className = "Rogue",
+      healthPercent = 22,
+      powerPercent = 8,
+      powerType = "energy",
+    }
+    fixture.scanner.HandleEvent("UNIT_HEALTH", { unit = "nameplate1" })
+
+    local combatant = fixture.scanner.GetPvpCombatants()[1]
+    assert.are.equal(22, combatant.healthPercent)
+    assert.are.equal(8, combatant.powerPercent)
+  end)
+
   it("does not add enemy npcs to targetable frames", function()
     local fixture = CreateFixture({
       unitName = "Defias Thug",

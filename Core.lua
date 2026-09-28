@@ -25,7 +25,6 @@ local EVENTS = {
   "PLAYER_FOCUS_CHANGED",
   "UPDATE_MOUSEOVER_UNIT",
   "NAME_PLATE_UNIT_ADDED",
-  "UNIT_TARGET",
   "COMBAT_LOG_EVENT_UNFILTERED",
   "PLAYER_DEAD",
 }
@@ -643,8 +642,14 @@ function Core.CreateScanner(dependencies)
     if unitToken then
       if dependencies.unitExists(unitToken) then
         combatant.unit = unitToken
-        combatant.healthPercent = ClassColors.ClampPercent(info.healthPercent)
-        combatant.powerPercent = ClassColors.ClampPercent(info.powerPercent)
+
+        if info.healthPercent ~= nil then
+          combatant.healthPercent = ClassColors.ClampPercent(info.healthPercent)
+        end
+
+        if info.powerPercent ~= nil then
+          combatant.powerPercent = ClassColors.ClampPercent(info.powerPercent)
+        end
       end
     end
 
@@ -1068,10 +1073,38 @@ function Core.CreateScanner(dependencies)
   end
 
   ---@param unit string
+  local function RefreshListedUnit(unit)
+    if not dependencies.unitExists(unit) then
+      return
+    end
+
+    local name = dependencies.unitName(unit)
+
+    if not name then
+      return
+    end
+
+    local foe = FindPvpCombatant(name)
+
+    if foe then
+      RefreshPvpCombatant(foe, foe.name, unit)
+      return
+    end
+
+    local friend = FindFriendlyCombatant(name)
+
+    if friend then
+      RefreshPvpCombatant(friend, friend.name, unit)
+    end
+  end
+
+  ---@param unit string
   local function CheckNearbyPlayer(unit)
     if not dependencies.unitExists(unit) then
       return
     end
+
+    RefreshListedUnit(unit)
 
     if not IsOtherPlayerUnit(unit) then
       return
@@ -1243,6 +1276,7 @@ function Core.CreateScanner(dependencies)
     if event == "PLAYER_TARGET_CHANGED" then
       CheckUnit("target", "target")
       CheckPvpOutgoingTarget()
+      CheckNearbyPlayer("target")
       return
     end
 
@@ -1269,6 +1303,41 @@ function Core.CreateScanner(dependencies)
     if event == "UNIT_TARGET" then
       if payload.unit then
         CheckPvpIncomingTarget(payload.unit)
+      end
+      return
+    end
+
+    if event == "UNIT_HEALTH" then
+      if payload.unit then
+        RefreshListedUnit(payload.unit)
+      end
+      return
+    end
+
+    if event == "UNIT_MAXHEALTH" then
+      if payload.unit then
+        RefreshListedUnit(payload.unit)
+      end
+      return
+    end
+
+    if event == "UNIT_POWER_UPDATE" then
+      if payload.unit then
+        RefreshListedUnit(payload.unit)
+      end
+      return
+    end
+
+    if event == "UNIT_POWER_FREQUENT" then
+      if payload.unit then
+        RefreshListedUnit(payload.unit)
+      end
+      return
+    end
+
+    if event == "UNIT_DISPLAYPOWER" then
+      if payload.unit then
+        RefreshListedUnit(payload.unit)
       end
       return
     end

@@ -139,9 +139,130 @@ local function PowerRgb(powerType)
   return 0.16, 0.51, 0.85
 end
 
+---@param bar any
+---@param unit string
+---@param currentFn function
+---@param maxFn function
+---@param powerIndex? number
+---@return boolean
+local function ApplyLiveResource(bar, unit, currentFn, maxFn, powerIndex)
+  if not bar then
+    return false
+  end
+
+  if not currentFn then
+    return false
+  end
+
+  if not maxFn then
+    return false
+  end
+
+  if not UnitExists then
+    return false
+  end
+
+  if not TypeGuards then
+    return false
+  end
+
+  if not TypeGuards.IsWowTruthy(UnitExists(unit)) then
+    return false
+  end
+
+  local ok = pcall(function()
+    local maxValue
+    local currentValue
+
+    if powerIndex then
+      maxValue = maxFn(unit, powerIndex)
+      currentValue = currentFn(unit, powerIndex)
+    else
+      maxValue = maxFn(unit)
+      currentValue = currentFn(unit)
+    end
+
+    bar:SetMinMaxValues(0, maxValue)
+    bar:SetValue(currentValue)
+  end)
+
+  return ok == true
+end
+
+---@param name string
+---@param preferred? string
+---@return string?
+local function FindLiveUnit(name, preferred)
+  if not UnitExists then
+    return preferred
+  end
+
+  ---@param unit string
+  ---@return boolean
+  local function UnitMatches(unit)
+    if not TypeGuards.IsWowTruthy(UnitExists(unit)) then
+      return false
+    end
+
+    if not UnitName then
+      return false
+    end
+
+    local ok, unitName = pcall(UnitName, unit)
+
+    if not ok then
+      return false
+    end
+
+    if type(unitName) ~= "string" then
+      return false
+    end
+
+    return string.lower(unitName) == string.lower(name)
+  end
+
+  if preferred then
+    if TypeGuards.IsWowTruthy(UnitExists(preferred)) then
+      return preferred
+    end
+  end
+
+  if UnitMatches("target") then
+    return "target"
+  end
+
+  if UnitMatches("focus") then
+    return "focus"
+  end
+
+  if UnitMatches("mouseover") then
+    return "mouseover"
+  end
+
+  local index = 1
+
+  while index <= MAX_FRAMES do
+    local unit = "nameplate" .. tostring(index)
+
+    if UnitMatches(unit) then
+      return unit
+    end
+
+    index = index + 1
+  end
+
+  return nil
+end
+
 local function InLockdown()
   if InCombatLockdown then
-    return InCombatLockdown() == true
+    if TypeGuards then
+      return TypeGuards.IsWowTruthy(InCombatLockdown())
+    end
+
+    if InCombatLockdown() then
+      return true
+    end
   end
 
   return false
@@ -215,6 +336,10 @@ local function CreateBoard(options)
     end
 
     if not CreateFrame then
+      return
+    end
+
+    if InLockdown() then
       return
     end
 
@@ -320,8 +445,9 @@ local function CreateBoard(options)
         stack,
         "SecureActionButtonTemplate"
       )
-      button:RegisterForClicks("AnyUp", "AnyDown")
+      button:RegisterForClicks("AnyDown")
       button:SetAttribute("type", "macro")
+      button:EnableMouse(true)
       button:Hide()
       button:SetScript("PostClick", function(self)
         local name = self.combatantName
@@ -384,7 +510,7 @@ local function CreateBoard(options)
       )
       dismiss:SetSize(DISMISS_PX, DISMISS_PX)
       dismiss:RegisterForClicks("LeftButtonUp")
-      dismiss:EnableMouse(true)
+      dismiss:EnableMouse(false)
       dismiss:SetFrameStrata("DIALOG")
       dismiss:Hide()
 
@@ -594,14 +720,58 @@ local function CreateBoard(options)
 
           slot.levelText:SetText(levelText)
 
-          local healthPercent = ClassColors.ClampPercent(combatant.healthPercent)
-          local powerPercent = ClassColors.ClampPercent(combatant.powerPercent)
           local pr, pg, pb = PowerRgb(combatant.powerType)
-
           slot.healthBar:SetStatusBarColor(HEALTH_GREEN_R, HEALTH_GREEN_G, HEALTH_GREEN_B, 1)
-          slot.healthBar:SetValue(healthPercent)
           slot.powerBar:SetStatusBarColor(pr, pg, pb, 1)
-          slot.powerBar:SetValue(powerPercent)
+
+          local liveUnit = FindLiveUnit(combatant.name, combatant.unit)
+          local liveHealth = false
+          local livePower = false
+
+          if liveUnit then
+            if UnitHealth then
+              if UnitHealthMax then
+                liveHealth = ApplyLiveResource(
+                  slot.healthBar,
+                  liveUnit,
+                  UnitHealth,
+                  UnitHealthMax
+                )
+              end
+            end
+
+            local powerIndex = nil
+
+            if UnitPowerType then
+              local powerOk, typeIndex = pcall(UnitPowerType, liveUnit)
+
+              if powerOk then
+                powerIndex = typeIndex
+              end
+            end
+
+            if UnitPower then
+              if UnitPowerMax then
+                livePower = ApplyLiveResource(
+                  slot.powerBar,
+                  liveUnit,
+                  UnitPower,
+                  UnitPowerMax,
+                  powerIndex
+                )
+              end
+            end
+          end
+
+          if not liveHealth then
+            slot.healthBar:SetMinMaxValues(0, 100)
+            slot.healthBar:SetValue(ClassColors.ClampPercent(combatant.healthPercent))
+          end
+
+          if not livePower then
+            slot.powerBar:SetMinMaxValues(0, 100)
+            slot.powerBar:SetValue(ClassColors.ClampPercent(combatant.powerPercent))
+          end
         end)
 
         if not painted then
@@ -610,7 +780,13 @@ local function CreateBoard(options)
           slot.levelText:SetText("?")
         end
 
+        slot.dismiss:EnableMouse(true)
         slot.dismiss:Show()
+
+        pcall(function()
+          slot.button:EnableMouse(true)
+          slot.button:Show()
+        end)
 
         if not lockdown then
           local macro = RaidFrames.BuildTargetMacro(combatant.name)
@@ -619,18 +795,18 @@ local function CreateBoard(options)
             slot.button:SetAttribute("type", "macro")
             slot.button:SetAttribute("macrotext", macro)
           end
-
-          slot.button:Show()
         end
       else
         slot.nameText:SetText("")
         slot.levelText:SetText("")
         slot.dismiss.combatantName = nil
         slot.button.combatantName = nil
+        slot.dismiss:EnableMouse(false)
         slot.dismiss:Hide()
 
         if not lockdown then
           slot.button:SetAttribute("macrotext", "")
+          slot.button:EnableMouse(false)
           slot.button:Hide()
         end
       end
